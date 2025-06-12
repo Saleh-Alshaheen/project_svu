@@ -11,6 +11,8 @@ const dotenv = require("dotenv");
 // Middleware for logging HTTP requests.
 const morgan = require("morgan");
 
+const packageJson = require("./package.json");
+
 // Load environment variables from config.env file.
 dotenv.config({ path: "config.env" });
 
@@ -46,6 +48,27 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
   console.log(`Mode: ${process.env.NODE_ENV}`);
 }
+
+// --- API Root Endpoint ---
+// A welcome route for the API root to provide basic info and guidance.
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "success",
+    message: "Welcome to the E-Commerce API!",
+    // Dynamically get the version from package.json
+    version: packageJson.version,
+    // IMPORTANT: Update this URL to point to your actual GitHub repository
+    documentation_url:
+      "https://github.com/Saleh-Alshaheen/project_svu/blob/main/README.md",
+    entryPoints: {
+      products: "/api/v1/products",
+      categories: "/api/v1/categories",
+      brands: "/api/v1/brands",
+      auth: "/api/v1/auth",
+      cart: "/api/v1/cart",
+    },
+  });
+});
 
 // --- Mount All Application Routes ---
 // A clean way to mount all routers from the routes/index.js file.
