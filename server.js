@@ -21,7 +21,8 @@ const dbConnect = require("./config/database");
 const mountRoutes = require("./routes");
 const ApiError = require("./utils/API_Errors");
 const globalErrorHandler = require("./Middlewares/error_middleware");
-
+// Import the webhook controller
+const { webhookCheckout } = require("./controllers/order_control");
 // Establish connection to the database.
 dbConnect();
 
@@ -36,6 +37,13 @@ app.options("*", cors()); // Enable pre-flight requests for all routes.
 
 // Compress all responses to reduce their size.
 app.use(compression());
+
+// Stripe webhook checkout
+app.post(
+  "/webhook-stripe",
+  express.raw({ type: "application/json" }), // Use raw body parser for this route only
+  webhookCheckout
+);
 
 // Parse incoming JSON payloads.
 app.use(express.json());
@@ -57,7 +65,6 @@ app.get("/", (req, res) => {
     message: "Welcome to the E-Commerce API!",
     // Dynamically get the version from package.json
     version: packageJson.version,
-    // IMPORTANT: Update this URL to point to your actual GitHub repository
     documentation_url:
       "https://github.com/Saleh-Alshaheen/project_svu/blob/main/README.md",
     entryPoints: {
