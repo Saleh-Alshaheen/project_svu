@@ -1,0 +1,63 @@
+{
+  // Specifies the base configurations to extend.
+  // 'airbnb': A very strict and popular style guide.
+  // 'prettier': Disables ESLint's stylistic rules that conflict with Prettier.
+  // 'plugin:node/recommended': Recommended rules for Node.js projects.
+  "extends": ["airbnb", "prettier", "plugin:node/recommended"],
+
+  // Integrates Prettier as an ESLint plugin to report formatting issues.
+  "plugins": ["prettier"],
+
+  // Configures the JavaScript language options.
+  "parserOptions": {
+    "ecmaVersion": 2020 // Allows for the parsing of modern ECMAScript features.
+  },
+
+  // Customizes or overrides rules from the extended configurations.
+  "rules": {
+    // This rule, when enabled, would report Prettier formatting issues as ESLint errors.
+    // "prettier/prettier": "error",
+
+    // Allows comments without a leading space (e.g., //comment).
+    "spaced-comment": "off",
+
+    // Allows the use of `console.log()` and other console methods.
+    "no-console": "off",
+
+    // Allows functions to have inconsistent return behavior (sometimes returning a value, sometimes not).
+    "consistent-return": "off",
+
+    // Allows the use of anonymous functions.
+    "func-names": "off",
+
+    // Disables the enforcement of object property shorthand syntax (e.g., { a: a } is allowed).
+    "object-shorthand": "off",
+
+    // Allows the use of `process.exit()`.
+    "no-process-exit": "off",
+
+    // Allows the reassignment of function parameters.
+    "no-param-reassign": "off",
+
+    // Allows using `return await` inside an async function.
+    "no-return-await": "off",
+
+    // Allows using dangling underscores in identifiers (e.g., `_id`).
+    "no-underscore-dangle": "off",
+
+    // Allows class methods that do not use `this`.
+    "class-methods-use-this": "off",
+
+    // Enforces that all variables are defined before use, preventing reference errors.
+    "no-undef": "error",
+
+    // Disables Node.js specific checks for ES syntax support. Assumes a modern Node.js environment.
+    "node/no-unsupported-features/es-syntax": "off",
+
+    // Enforces object destructuring but allows for array destructuring to be optional.
+    "prefer-destructuring": ["error", { "object": true, "array": false }],
+
+    // Warns about unused variables but ignores common Express.js middleware parameters.
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "req|res|next|val" }]
+  }
+}

@@ -1,0 +1,7 @@
+# Ignore the node_modules directory, which contains all installed dependencies.
+# This directory is generated locally using 'npm install' and should not be versioned.
+node_modules/
+
+# Ignore the environment configuration file.
+# This file contains sensitive data like database credentials, API keys, and secrets.
+config.env
