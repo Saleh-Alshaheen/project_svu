@@ -25,7 +25,6 @@ const userSchema = new mongoose.Schema(
       required: [true, "Password is required."],
       minlength: [6, "Password must be at least 6 characters long."],
     },
-
     passwordChangedAt: Date,
     passwordResetCode: String,
     passwordResetExpire: Date,
@@ -57,8 +56,23 @@ const userSchema = new mongoose.Schema(
       },
     ],
   },
-  // Automatically adds createdAt and updatedAt fields.
-  { timestamps: true }
+  // Schema options
+  {
+    timestamps: true,
+    // Add the toJSON option with a transform function
+    toJSON: {
+      transform: function (doc, ret) {
+        // 'ret' is the plain object representation of the document.
+        // We delete the sensitive fields from this object before it's sent in a response.
+        delete ret.password;
+        delete ret.passwordChangedAt;
+        delete ret.passwordResetCode;
+        delete ret.passwordResetExpire;
+        delete ret.passwordResetVerified;
+        return ret;
+      },
+    },
+  }
 );
 
 /**

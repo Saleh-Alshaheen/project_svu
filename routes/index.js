@@ -1,4 +1,4 @@
-// Import all the individual router modules for each feature.
+// routes/index.js
 const categoryRoute = require("./category_route");
 const subCategoryRoute = require("./subcategory_route");
 const brandRoute = require("./brand_route");
@@ -12,13 +12,7 @@ const couponRoute = require("./coupon_route");
 const cartRoute = require("./cart_route");
 const orderRoute = require("./order_route");
 
-/**
- * @description A function to mount all API routes into the main Express app.
- * This centralizes route management and keeps the main server file clean.
- * @param {import('express').Application} app - The Express application instance.
- */
 const mountRoutes = (app) => {
-  // Mount each router on its designated base path.
   app.use("/api/v1/categories", categoryRoute);
   app.use("/api/v1/subcategories", subCategoryRoute);
   app.use("/api/v1/brands", brandRoute);

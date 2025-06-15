@@ -11,9 +11,16 @@ const dotenv = require("dotenv");
 // Middleware for logging HTTP requests.
 const morgan = require("morgan");
 
+const { rateLimit } = require("express-rate-limit");
+const hpp = require("hpp");
+const mongoSanitize = require("express-mongo-sanitize");
+
+// ---> 1. IMPORT helmet
+const helmet = require("helmet");
+
+const sanitizeInput = require("./Middlewares/sanitizer_middleware");
 const packageJson = require("./package.json");
 
-// Load environment variables from config.env file.
 dotenv.config({ path: "config.env" });
 
 // Import custom modules from our application structure.
@@ -21,24 +28,28 @@ const dbConnect = require("./config/database");
 const mountRoutes = require("./routes");
 const ApiError = require("./utils/API_Errors");
 const globalErrorHandler = require("./Middlewares/error_middleware");
-// Import the webhook controller
 const { webhookCheckout } = require("./controllers/order_control");
+
 // Establish connection to the database.
 dbConnect();
 
 // Initialize the Express application.
 const app = express();
 
-// --- Middlewares ---
+// --- Global Middlewares (in order) ---
+
+// 2. Set security headers as the very first middleware.
+app.use(helmet());
 
 // Enable Cross-Origin Resource Sharing for all routes.
 app.use(cors());
-app.options("*", cors()); // Enable pre-flight requests for all routes.
-
-// Compress all responses to reduce their size.
+app.options("*", cors());
 app.use(compression());
 
-// Stripe webhook checkout
+// Sanitize data to prevent NoSQL query injection.
+app.use(mongoSanitize());
+
+// Special route for Stripe webhook must come BEFORE express.json()
 app.post(
   "/webhook-stripe",
   express.raw({ type: "application/json" }), // Use raw body parser for this route only
@@ -46,9 +57,24 @@ app.post(
 );
 
 // Parse incoming JSON payloads.
-app.use(express.json());
+app.use(express.json({ limit: "25kb" }));
 
-// Serve static files from the 'uploads' directory.
+// Sanitize user input from potential XSS attacks.
+app.use(sanitizeInput);
+
+// Protect against HTTP Parameter Pollution attacks
+app.use(
+  hpp({
+    whitelist: [
+      "price",
+      "sold",
+      "quantity",
+      "ratingsAverage",
+      "ratingsQuantity",
+      "colors",
+    ],
+  })
+);
 app.use(express.static(path.join(__dirname, "uploads")));
 
 // Use Morgan for HTTP request logging only in the development environment.
@@ -57,55 +83,45 @@ if (process.env.NODE_ENV === "development") {
   console.log(`Mode: ${process.env.NODE_ENV}`);
 }
 
+// Apply the rate limiting middleware to all API requests.
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  message: "Too many requests from this IP, please try again after 15 minutes",
+});
+app.use("/api", limiter);
+
 // --- API Root Endpoint ---
-// A welcome route for the API root to provide basic info and guidance.
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
     message: "Welcome to the E-Commerce API!",
-    // Dynamically get the version from package.json
     version: packageJson.version,
     documentation_url:
       "https://github.com/Saleh-Alshaheen/project_svu/blob/main/README.md",
-    entryPoints: {
-      products: "/api/v1/products",
-      categories: "/api/v1/categories",
-      brands: "/api/v1/brands",
-      auth: "/api/v1/auth",
-      cart: "/api/v1/cart",
-    },
   });
 });
 
 // --- Mount All Application Routes ---
-// A clean way to mount all routers from the routes/index.js file.
 mountRoutes(app);
 
-// --- Error Handling Middlewares ---
-
-// Catch-all route for any requests that don't match the routes above.
-// This creates a 404 Not Found error and passes it to the global error handler.
+// --- Error Handling Middlewares (must be last) ---
 app.all("*", (req, res, next) => {
   next(new ApiError(`Can't find this route: ${req.originalUrl}`, 404));
 });
 
-// Use the global error handling middleware to catch all operational and programming errors.
 app.use(globalErrorHandler);
 
 // --- Start Server ---
-
 const PORT = process.env.PORT || 8000;
 const server = app.listen(PORT, () => {
   console.log(`App running on port ${PORT}`);
 });
 
-// --- Handle Unhandled Promise Rejections ---
-// This is a safety net for any asynchronous errors that are not caught elsewhere.
 process.on("unhandledRejection", (err) => {
   console.error(`Unhandled Rejection Errors: ${err.name} | ${err.message}`);
-  // Gracefully shut down the server instead of letting it crash abruptly.
   server.close(() => {
-    console.error(`Shutting down application due to unhandled rejection...`);
+    console.error(`Shutting down application...`);
     process.exit(1);
   });
 });

@@ -16,19 +16,16 @@ const sendEmail = require("../utils/SendEmail");
 const userModel = require("../models/user_model");
 
 /**
- * @description Creates a sanitized user object safe for sending in responses.
- * @param {object} userDoc - The Mongoose user document.
- * @returns {object} A user object without sensitive information.
+ * @description Creates a simplified and optimal user object (DTO) for auth responses.
+ * @param {object} user - The full Mongoose user document.
+ * @returns {object} An object with only the essential user fields for the frontend.
  */
-const sanitizeUserForResponse = (userDoc) => {
-  const user = userDoc.toObject();
-  delete user.password;
-  delete user.passwordChangedAt;
-  delete user.passwordResetCode;
-  delete user.passwordResetExpire;
-  delete user.passwordResetVerified;
-  return user;
-};
+const createAuthResponseUser = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+});
 
 /**
  * @desc    User signup
@@ -36,17 +33,15 @@ const sanitizeUserForResponse = (userDoc) => {
  * @access  Public
  */
 exports.signup = asyncHandler(async (req, res, next) => {
-  // 1) Create slug from the user's name.
   req.body.slug = slugify(req.body.name);
-
-  // 2) Create user. Password hashing is handled by a pre-save hook in the model.
   const user = await userModel.create(req.body);
-
-  // 3) Generate a JWT for the new user.
   const token = createToken(user._id);
 
-  // 4) Send the response with a sanitized user object.
-  res.status(201).json({ data: sanitizeUserForResponse(user), token });
+  // Create a minimal user object for the response payload.
+  const responseUser = createAuthResponseUser(user);
+
+  // Send the optimized response.
+  res.status(201).json({ data: responseUser, token });
 });
 
 /**
@@ -55,18 +50,17 @@ exports.signup = asyncHandler(async (req, res, next) => {
  * @access  Public
  */
 exports.login = asyncHandler(async (req, res, next) => {
-  // 1) Check if user exists and if password is correct.
   const user = await userModel.findOne({ email: req.body.email });
-
   if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
     return next(new ApiError("Incorrect email or password.", 401));
   }
-
-  // 2) Generate a new JWT for the logged-in user.
   const token = createToken(user._id);
 
-  // 3) Send response with a sanitized user object.
-  res.status(200).json({ data: sanitizeUserForResponse(user), token });
+  // Create a minimal user object for the response payload.
+  const responseUser = createAuthResponseUser(user);
+
+  // Send the optimized response.
+  res.status(200).json({ data: responseUser, token });
 });
 
 /**
@@ -74,7 +68,6 @@ exports.login = asyncHandler(async (req, res, next) => {
  * Verifies the JWT and checks if the user still exists.
  */
 exports.protect = asyncHandler(async (req, res, next) => {
-  // 1) Check if token exists in the headers.
   let token;
   if (
     req.headers.authorization &&
@@ -89,10 +82,7 @@ exports.protect = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // 2) Verify the token. Our global error handler will catch any errors.
   const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-
-  // 3) Check if the user associated with the token still exists.
   const currentUser = await userModel.findById(decoded.id);
   if (!currentUser) {
     return next(
@@ -100,7 +90,6 @@ exports.protect = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // 4) Check if user changed password after the token was issued.
   if (currentUser.passwordChangedAt) {
     const passwordChangedTimestamp = parseInt(
       currentUser.passwordChangedAt.getTime() / 1000,
@@ -115,7 +104,6 @@ exports.protect = asyncHandler(async (req, res, next) => {
       );
     }
   }
-  // Grant access and attach user to the request object.
   req.user = currentUser;
   next();
 });
@@ -218,9 +206,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
     return next(new ApiError("Reset code not verified.", 400));
   }
 
-  // The password hashing is handled by a pre-save hook in the user model.
   user.password = req.body.newPassword;
-
   user.passwordChangedAt = Date.now();
   user.passwordResetCode = undefined;
   user.passwordResetExpire = undefined;
@@ -228,7 +214,6 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
 
   await user.save();
 
-  // Generate a new token and send it in the response.
   const token = createToken(user._id);
   res.status(200).json({ token });
 });
