@@ -94,7 +94,7 @@ EMAIL_FROM="E-Shop" <youremail@example.com>
 1.  **Start the server:**
 
     ```bash
-    npm run dev
+    npm run start:dev
     ```
 
     The server will start on the port specified in your `config.env` file (e.g., `http://localhost:8000`).

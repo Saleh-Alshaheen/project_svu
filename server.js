@@ -57,7 +57,7 @@ app.post(
 );
 
 // Parse incoming JSON payloads.
-app.use(express.json({ limit: "25kb" }));
+app.use(express.json({ limit: "1000kb" }));
 
 // Sanitize user input from potential XSS attacks.
 app.use(sanitizeInput);
@@ -86,7 +86,7 @@ if (process.env.NODE_ENV === "development") {
 // Apply the rate limiting middleware to all API requests.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100,
+  limit: 10000,
   message: "Too many requests from this IP, please try again after 15 minutes",
 });
 app.use("/api", limiter);
