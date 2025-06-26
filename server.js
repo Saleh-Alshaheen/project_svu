@@ -86,7 +86,7 @@ if (process.env.NODE_ENV === "development") {
 // Apply the rate limiting middleware to all API requests.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10000,
+  limit: 100000,
   message: "Too many requests from this IP, please try again after 15 minutes",
 });
 app.use("/api", limiter);
