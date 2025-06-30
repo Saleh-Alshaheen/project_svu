@@ -39,7 +39,7 @@ const app = express();
 // --- Global Middlewares (in order) ---
 
 // 2. Set security headers as the very first middleware.
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Enable Cross-Origin Resource Sharing for all routes.
 app.use(cors());
