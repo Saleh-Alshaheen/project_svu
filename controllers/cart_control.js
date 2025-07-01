@@ -15,7 +15,6 @@ const calcTotalCartPrice = (cart) => {
   });
 
   cart.totalCartPrice = totalPrice;
-  // When the cart contents change, any previously applied discount is invalidated.
   cart.totalPriceAfterDiscount = undefined;
 };
 
@@ -28,16 +27,21 @@ exports.addProductToCart = asyncHandler(async (req, res, next) => {
   const { productId, color } = req.body;
   const product = await ProductModel.findById(productId);
 
-  // 1) Get the user's cart, or create a new one if it doesn't exist.
+  // 1. Determine the correct price to use (discounted price if available, otherwise regular price).
+  const productPrice = product.priceAfterDiscount || product.price;
+
+  // 2. Get the user's cart, or create a new one if it doesn't exist.
   let cart = await CartModel.findOne({ user: req.user._id });
 
   if (!cart) {
+    // Create a new cart with the first product.
     cart = await CartModel.create({
       user: req.user._id,
-      cartItems: [{ product: productId, color, price: product.price }],
+      // Use the calculated productPrice here.
+      cartItems: [{ product: productId, color, price: productPrice }],
     });
   } else {
-    // 2) Check if the product (with the same color) already exists in the cart.
+    // 3. If cart exists, check if the product (with the same color) already exists.
     const productIndex = cart.cartItems.findIndex(
       (item) => item.product.toString() === productId && item.color === color
     );
@@ -48,12 +52,12 @@ exports.addProductToCart = asyncHandler(async (req, res, next) => {
       cartItem.quantity += 1;
       cart.cartItems[productIndex] = cartItem;
     } else {
-      // If not, push a new item to the cart.
-      cart.cartItems.push({ product: productId, color, price: product.price });
+      // If not, push a new item to the cart, using the calculated productPrice.
+      cart.cartItems.push({ product: productId, color, price: productPrice });
     }
   }
 
-  // 3) Recalculate total price and save the cart.
+  // 4. Recalculate total price and save the cart.
   calcTotalCartPrice(cart);
   await cart.save();
 
@@ -67,8 +71,6 @@ exports.addProductToCart = asyncHandler(async (req, res, next) => {
 
 /**
  * @desc    Get the logged-in user's cart.
- * @route   GET /api/v1/cart
- * @access  Private (User)
  */
 exports.getLoggedUserCart = asyncHandler(async (req, res, next) => {
   const cart = await CartModel.findOne({ user: req.user._id }).populate({
@@ -91,8 +93,6 @@ exports.getLoggedUserCart = asyncHandler(async (req, res, next) => {
 
 /**
  * @desc    Remove a specific item from the cart.
- * @route   DELETE /api/v1/cart/:itemId
- * @access  Private (User)
  */
 exports.removeSpecificCartItem = asyncHandler(async (req, res, next) => {
   const cart = await CartModel.findOneAndUpdate(
@@ -103,7 +103,6 @@ exports.removeSpecificCartItem = asyncHandler(async (req, res, next) => {
     { new: true }
   );
 
-  // Recalculate total price after removing an item.
   if (cart) {
     calcTotalCartPrice(cart);
     await cart.save();
@@ -118,19 +117,14 @@ exports.removeSpecificCartItem = asyncHandler(async (req, res, next) => {
 
 /**
  * @desc    Clear all items from the cart.
- * @route   DELETE /api/v1/cart
- * @access  Private (User)
  */
 exports.clearCart = asyncHandler(async (req, res, next) => {
   await CartModel.findOneAndDelete({ user: req.user._id });
-  // A 204 response must not have a body.
   res.status(204).send();
 });
 
 /**
  * @desc    Update a specific cart item's quantity.
- * @route   PUT /api/v1/cart/:itemId
- * @access  Private (User)
  */
 exports.updateCartItemQuantity = asyncHandler(async (req, res, next) => {
   const { quantity } = req.body;
@@ -166,11 +160,8 @@ exports.updateCartItemQuantity = asyncHandler(async (req, res, next) => {
 
 /**
  * @desc    Apply a coupon to the user's cart.
- * @route   PUT /api/v1/cart/applyCoupon
- * @access  Private (User)
  */
 exports.applyCoupon = asyncHandler(async (req, res, next) => {
-  // 1) Find coupon by name and check if it's valid and not expired.
   const coupon = await CouponModel.findOne({
     name: req.body.coupon.toUpperCase(),
     expire: { $gt: Date.now() },
@@ -180,11 +171,9 @@ exports.applyCoupon = asyncHandler(async (req, res, next) => {
     return next(new ApiError(`Coupon is invalid or expired.`, 404));
   }
 
-  // 2) Get user's cart and apply the discount.
   const cart = await CartModel.findOne({ user: req.user._id });
   const totalPrice = cart.totalCartPrice;
 
-  // Calculate as a number, not a string.
   const totalPriceAfterDiscount = parseFloat(
     (totalPrice - (totalPrice * coupon.discount) / 100).toFixed(2)
   );
