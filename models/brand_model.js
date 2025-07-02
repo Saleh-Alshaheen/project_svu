@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const cloudinary = require("cloudinary").v2; // Import Cloudinary here as well
 
 // Define the schema for the Brand model.
 const brandSchema = new mongoose.Schema(
@@ -28,7 +29,9 @@ const brandSchema = new mongoose.Schema(
  */
 const setImageUrl = (doc) => {
   if (doc.image) {
-    const imageUrl = `${process.env.BASE_URL}/brands/${doc.image}`;
+    // Build the Cloudinary URL using its SDK
+    // The doc.image now holds the public_id, e.g., 'brands/brand-123-456'
+    const imageUrl = cloudinary.url(doc.image, {});
     doc.image = imageUrl;
   }
 };

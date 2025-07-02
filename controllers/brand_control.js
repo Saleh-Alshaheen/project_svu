@@ -1,9 +1,19 @@
+// controllers/brand_control.js
 const asyncHandler = require("express-async-handler");
-const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
+const { v4: uuidv4 } = require("uuid");
+const cloudinary = require("cloudinary").v2; // Import Cloudinary
+
 const factory = require("./handler_Factory");
 const { uploadSingleImage } = require("../Middlewares/UploadImage_middleware");
 const BrandModel = require("../models/brand_model");
+
+// Configure Cloudinary with your credentials from environment variables
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 /**
  * @desc    Middleware to upload a single brand image.
@@ -11,57 +21,50 @@ const BrandModel = require("../models/brand_model");
 exports.uploadBrandImage = uploadSingleImage("image");
 
 /**
- * @desc    Middleware to process (resize) the uploaded brand image.
+ * @desc    Middleware to process and upload the brand image to Cloudinary.
  */
 exports.resizeImage = asyncHandler(async (req, res, next) => {
   if (!req.file) {
     return next();
   }
 
-  const filename = `brand-${uuidv4()}-${Date.now()}.png`;
+  // Generate a unique public ID for the image in Cloudinary
+  const publicId = `brand-${uuidv4()}-${Date.now()}`;
 
-  await sharp(req.file.buffer)
-    .resize(200, 170)
-    .toFormat("png")
-    .png({ quality: 90 })
-    .toFile(`uploads/brands/${filename}`);
+  // Process the image with Sharp and upload the buffer to Cloudinary
+  await new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        public_id: publicId,
+        // Optional: Apply transformations, place in a folder, etc.
+        folder: "brands",
+        transformation: [{ width: 600, height: 600, crop: "fill" }],
+      },
+      (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+        // Save the Cloudinary public_id to the request body.
+        // We no longer save a filename, but the unique ID from Cloudinary.
+        req.body.image = result.public_id;
+        resolve(result);
+      }
+    );
 
-  // Save the filename to the request body to be stored in the database.
-  req.body.image = filename;
+    // Create a readable stream from the buffer and pipe it to Cloudinary
+    sharp(req.file.buffer)
+      .resize(600, 600)
+      .toFormat("png")
+      .png({ quality: 95 })
+      .pipe(uploadStream);
+  });
+
   next();
 });
 
-/**
- * @desc    Get a list of all brands
- * @route   GET /api/v1/brands
- * @access  Public
- */
+// The rest of your CRUD functions remain the same
 exports.getBrands = factory.getAll(BrandModel, ["name"]);
-
-/**
- * @desc    Get a specific brand by ID
- * @route   GET /api/v1/brands/:id
- * @access  Public
- */
 exports.getBrand = factory.getOne(BrandModel);
-
-/**
- * @desc    Create a new brand
- * @route   POST /api/v1/brands
- * @access  Private (Admin/Manager)
- */
 exports.createBrand = factory.createOne(BrandModel);
-
-/**
- * @desc    Update a specific brand
- * @route   PUT /api/v1/brands/:id
- * @access  Private (Admin/Manager)
- */
 exports.updateBrand = factory.updateOne(BrandModel);
-
-/**
- * @desc    Delete a specific brand
- * @route   DELETE /api/v1/brands/:id
- * @access  Private (Admin/Manager)
- */
 exports.deleteBrand = factory.deleteOne(BrandModel);

@@ -1,49 +1,40 @@
 const mongoose = require("mongoose");
+const cloudinary = require("cloudinary").v2;
 
-// Define the schema for the Category model.
+// Configure Cloudinary inside the model file
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const categorySchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Category name is required."],
-      unique: [true, "The category name must be unique."],
-      minlength: [3, "Name is too short, must be at least 3 characters."],
-      maxlength: [30, "Name is too long, must be shorter than 30 characters."],
+      required: true,
+      unique: true,
+      minlength: 3,
+      maxlength: 32,
     },
-    slug: {
-      type: String,
-      lowercase: true,
-    },
-    // Stores the filename of the category image, e.g., 'category-12345.png'
+    slug: { type: String, lowercase: true },
+    // This field now stores the Cloudinary public_id
     image: String,
   },
-  // Automatically adds createdAt and updatedAt timestamps.
   { timestamps: true }
 );
 
-/**
- * @description A function to transform the stored image filename into a full URL.
- * @param {object} doc - The Mongoose document.
- */
+// This function now builds a Cloudinary URL
 const setImageUrl = (doc) => {
-  // Only add the image URL if an image filename exists in the document.
   if (doc.image) {
-    const imageUrl = `${process.env.BASE_URL}/categories/${doc.image}`;
-    doc.image = imageUrl;
+    // The cloudinary.url() method generates the full, public URL from the public_id
+    doc.image = cloudinary.url(doc.image);
   }
 };
 
-// Mongoose 'post' hook that runs after a document is initialized (e.g., via find).
-// This transforms the image path to a full URL before sending it in a response.
-categorySchema.post("init", (doc) => {
-  setImageUrl(doc);
-});
-
-// Mongoose 'post' hook that runs after a document is saved (create/update).
-// This ensures the returned document also has the full image URL.
-categorySchema.post("save", (doc) => {
-  setImageUrl(doc);
-});
+// The post hooks remain the same, but now call the updated function
+categorySchema.post("init", (doc) => setImageUrl(doc));
+categorySchema.post("save", (doc) => setImageUrl(doc));
 
 const CategoryModel = mongoose.model("Category", categorySchema);
 module.exports = CategoryModel;

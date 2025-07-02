@@ -1,5 +1,13 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const cloudinary = require("cloudinary").v2; // 1. Import Cloudinary
+
+// 2. Configure Cloudinary inside the model file
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const userSchema = new mongoose.Schema(
   {
@@ -19,6 +27,7 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
     },
     phone: String,
+    // This field now stores the Cloudinary public_id
     profileImage: String,
     password: {
       type: String,
@@ -38,14 +47,12 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    // Foreign key relationship to the Product model.
     wishlist: [
       {
         type: mongoose.Schema.ObjectId,
         ref: "Product",
       },
     ],
-    // Array of sub-documents for storing user addresses.
     addresses: [
       {
         alias: String,
@@ -56,14 +63,10 @@ const userSchema = new mongoose.Schema(
       },
     ],
   },
-  // Schema options
   {
     timestamps: true,
-    // Add the toJSON option with a transform function
     toJSON: {
       transform: function (doc, ret) {
-        // 'ret' is the plain object representation of the document.
-        // We delete the sensitive fields from this object before it's sent in a response.
         delete ret.password;
         delete ret.passwordChangedAt;
         delete ret.passwordResetCode;
@@ -75,15 +78,23 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// ---> 3. ADD a hook to generate the full image URL from Cloudinary
+const setImageUrl = (doc) => {
+  if (doc.profileImage) {
+    // The cloudinary.url() method generates the full, public URL from the public_id
+    doc.profileImage = cloudinary.url(doc.profileImage);
+  }
+};
+
+// Apply the hook for find and save operations
+userSchema.post("init", (doc) => setImageUrl(doc));
+userSchema.post("save", (doc) => setImageUrl(doc));
+
 /**
  * Mongoose 'pre-save' hook to hash the password before saving it to the database.
- * This hook only runs if the password field has been modified.
  */
 userSchema.pre("save", async function (next) {
-  // If the password wasn't modified, don't re-hash it.
   if (!this.isModified("password")) return next();
-
-  // Hash the password with a salt round of 12 (a strong default).
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });

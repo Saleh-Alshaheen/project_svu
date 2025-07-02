@@ -1,9 +1,18 @@
-const sharp = require("sharp");
-const { v4: uuidv4 } = require("uuid");
 const asyncHandler = require("express-async-handler");
-const CategoryModel = require("../models/category_model");
+const { v4: uuidv4 } = require("uuid");
+const sharp = require("sharp");
+const cloudinary = require("cloudinary").v2;
+
 const factory = require("./handler_Factory");
 const { uploadSingleImage } = require("../Middlewares/UploadImage_middleware");
+const CategoryModel = require("../models/category_model");
+
+// Configure Cloudinary with your credentials
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 /**
  * @desc    Middleware to upload a single category image.
@@ -11,57 +20,39 @@ const { uploadSingleImage } = require("../Middlewares/UploadImage_middleware");
 exports.uploadCategoryImage = uploadSingleImage("image");
 
 /**
- * @desc    Middleware to process (resize) the uploaded category image.
+ * @desc    Middleware to process the image and upload it to Cloudinary.
  */
 exports.resizeImage = asyncHandler(async (req, res, next) => {
-  // Proceed only if a file was uploaded.
-  if (req.file) {
-    // Generate a unique filename to prevent conflicts.
-    const filename = `category-${uuidv4()}-${Date.now()}.png`;
-
-    await sharp(req.file.buffer)
-      .resize(140, 80) // Resize to a standard dimension.
-      .toFormat("png")
-      .png({ quality: 90 }) // Set compression quality.
-      .toFile(`uploads/categories/${filename}`); // Save to the correct folder.
-
-    // Save the filename to the request body to be stored in the database.
-    req.body.image = filename;
+  if (!req.file) {
+    return next();
   }
+
+  const publicId = `category-${uuidv4()}-${Date.now()}`;
+
+  // Process image and upload the resulting buffer to Cloudinary
+  await new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        public_id: publicId,
+        folder: "categories",
+        transformation: [{ width: 600, height: 600, crop: "fill" }],
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        // Save the Cloudinary public_id to the request body
+        req.body.image = result.public_id;
+        resolve(result);
+      }
+    );
+    sharp(req.file.buffer).pipe(uploadStream);
+  });
+
   next();
 });
 
-/**
- * @desc    Get a list of all categories
- * @route   GET /api/v1/categories
- * @access  Public
- */
+// --- Factory-based handlers remain the same ---
 exports.getCategories = factory.getAll(CategoryModel, ["name"]);
-
-/**
- * @desc    Get a specific category by ID
- * @route   GET /api/v1/categories/:id
- * @access  Public
- */
 exports.getCategory = factory.getOne(CategoryModel);
-
-/**
- * @desc    Create a new category
- * @route   POST /api/v1/categories
- * @access  Private (Admin/Manager)
- */
 exports.createCategory = factory.createOne(CategoryModel);
-
-/**
- * @desc    Update a specific category
- * @route   PUT /api/v1/categories/:id
- * @access  Private (Admin/Manager)
- */
 exports.updateCategory = factory.updateOne(CategoryModel);
-
-/**
- * @desc    Delete a specific category
- * @route   DELETE /api/v1/categories/:id
- * @access  Private (Admin/Manager)
- */
 exports.deleteCategory = factory.deleteOne(CategoryModel);
