@@ -14,8 +14,6 @@ const morgan = require("morgan");
 const { rateLimit } = require("express-rate-limit");
 const hpp = require("hpp");
 const mongoSanitize = require("express-mongo-sanitize");
-
-// ---> 1. IMPORT helmet
 const helmet = require("helmet");
 
 const sanitizeInput = require("./Middlewares/sanitizer_middleware");
@@ -38,12 +36,15 @@ const app = express();
 
 // --- Global Middlewares (in order) ---
 
-// 2. Set security headers as the very first middleware.
-app.use(helmet({ crossOriginResourcePolicy: false }));
+// Set security headers as the very first middleware.
+app.use(helmet());
 
-// Enable Cross-Origin Resource Sharing for all routes.
+// ---> 1. REVERT TO SIMPLE CORS CONFIGURATION
+// Enable Cross-Origin Resource Sharing for all origins.
 app.use(cors());
-app.options("*", cors());
+app.options("*", cors()); // Enable pre-flight requests for all routes
+
+// Compress all responses.
 app.use(compression());
 
 // Sanitize data to prevent NoSQL query injection.
@@ -52,17 +53,17 @@ app.use(mongoSanitize());
 // Special route for Stripe webhook must come BEFORE express.json()
 app.post(
   "/webhook-stripe",
-  express.raw({ type: "application/json" }), // Use raw body parser for this route only
+  express.raw({ type: "application/json" }),
   webhookCheckout
 );
 
 // Parse incoming JSON payloads.
-app.use(express.json({ limit: "1000kb" }));
+app.use(express.json({ limit: "2500kb" }));
 
 // Sanitize user input from potential XSS attacks.
 app.use(sanitizeInput);
 
-// Protect against HTTP Parameter Pollution attacks
+// Protect against HTTP Parameter Pollution attacks.
 app.use(
   hpp({
     whitelist: [
@@ -77,16 +78,16 @@ app.use(
 );
 app.use(express.static(path.join(__dirname, "uploads")));
 
-// Use Morgan for HTTP request logging only in the development environment.
+// Use Morgan for logging in development.
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
   console.log(`Mode: ${process.env.NODE_ENV}`);
 }
 
-// Apply the rate limiting middleware to all API requests.
+// Apply a reasonable rate limit to API routes.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100000,
+  limit: 1000,
   message: "Too many requests from this IP, please try again after 15 minutes",
 });
 app.use("/api", limiter);
