@@ -32,7 +32,7 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 const allowedOrigins = [
   "http://localhost:8000",
   "http://localhost:3000",
-  "https://ourproject1.vercel.app/",
+  "https://ourproject1.vercel.app",
 ];
 
 const corsOptions = {
