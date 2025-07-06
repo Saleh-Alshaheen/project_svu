@@ -206,7 +206,7 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
       quantity: item.quantity,
     })),
     mode: "payment",
-    success_url: `${req.protocol}://${req.get("host")}/user/allorders`,
+    success_url: `https://ourproject1.vercel.app/user/allorders`,
     cancel_url: `${req.protocol}://${req.get("host")}/cart`,
     customer_email: req.user.email,
     client_reference_id: req.params.cartId,
