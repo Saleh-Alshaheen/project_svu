@@ -60,7 +60,7 @@ app.post(
   webhookCheckout
 );
 
-app.use(express.json({ limit: "1000kb" }));
+app.use(express.json({ limit: "100kb" }));
 app.use(sanitizeInput);
 
 app.use(
@@ -84,7 +84,7 @@ if (process.env.NODE_ENV === "development") {
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 1000, // Corrected to a reasonable limit
+  limit: 100, // Corrected to a reasonable limit
   message: "Too many requests from this IP, please try again after 15 minutes",
 });
 app.use("/api", limiter);
